@@ -80,7 +80,7 @@ def run(settings):
     objective = {'rgb': PixelWiseError(metric='l1', boundary_ignore=None), 
                  'psnr': PSNR(boundary_ignore=40)}
     loss_weight = {'rgb': 1.0}
-    actor = dbsr_actors.DBSRSyntheticActorMultiOut(net=net, objective=objective, loss_weight=loss_weight)
+    actor = dbsr_actors.DBSRSyntheticActor(net=net, objective=objective, loss_weight=loss_weight)
     optimizer = torch.optim.AdamW([{'params': actor.net.parameters(), 'lr': 1e-4}],
                            lr=2e-4)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 400, eta_min=1e-6) 

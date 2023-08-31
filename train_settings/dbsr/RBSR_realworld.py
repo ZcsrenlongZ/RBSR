@@ -78,9 +78,9 @@ def run(settings):
     pwcnet = PWCNet(load_pretrained=True,
                     weights_path='{}/pwcnet-network-default.pth'.format(env_settings().pretrained_nets_dir))
 
-    actor = dbsr_actors.DBSRRealWorldMultiLossActor(net=net, objective=objective, loss_weight=loss_weight, alignment_net=pwcnet)
+    actor = dbsr_actors.DBSRRealWorldActor(net=net, objective=objective, loss_weight=loss_weight, alignment_net=pwcnet)
 
-    optimizer = optim.Adam([{'params': actor.net.parameters(), 'lr': 1e-4}],
+    optimizer = optim.Adam([{'params': actor.net.parameters(), 'lr': 5e-5}],
                            lr=2e-4)
     lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.1)
 

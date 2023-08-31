@@ -1,4 +1,4 @@
-# RBSR: Efficient and Flexible Recurrent Network for Burst Super-Resolution
+# RBSR: Efficient and Flexible Recurrent Network for Burst Super-Resolution [PRCV2023]
 
 Official implementation of [RBSR: Efficient and Flexible Recurrent Network for Burst Super-Resolution](https://arxiv.org/abs/2306.17595)
 
@@ -65,7 +65,7 @@ python ./run_training.py dbsr RBSR_synthetic
 ```
 Please change the the `zurichraw2rgb_dir` variable in [admin/local.py](admin/local.py) to your train dataset path.
 
-## Train on SyntheticBurst Dataset 
+## Train on BurstSR Dataset 
 You can train RBSR on BurstSR dataset by running
 ```bash
 python ./run_training.py dbsr RBSR_realworld

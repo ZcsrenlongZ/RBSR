@@ -28,37 +28,6 @@ class DBSRSyntheticActor(BaseActor):
     def __call__(self, data):
         # Run network
         pred, aux_dict = self.net(data['burst'])
-
-        # Compute loss
-        loss_rgb_raw = self.objective['rgb'](pred, data['frame_gt'])
-        # jia yi xiang fuzhu loss
-        # loss_rgb_raw = self.objective['rgb'](pred[:, 0, ...], data['frame_gt']) + 0.1 *self.objective['rgb'](pred[:, 1, ...], data['frame_gt'])
-        loss_rgb = self.loss_weight['rgb'] * loss_rgb_raw
-
-        if 'psnr' in self.objective.keys():
-            psnr = self.objective['psnr'](pred[:, ...].clone().detach(), data['frame_gt'])
-
-        loss = loss_rgb
-
-        stats = {'Loss/total': loss.item(),
-                 'Loss/rgb': loss_rgb.item(),
-                 'Loss/raw/rgb': loss_rgb_raw.item()}
-
-        if 'psnr' in self.objective.keys():
-            stats['Stat/psnr'] = psnr.item()
-
-        return loss, stats
-class DBSRSyntheticActorMultiOut(BaseActor):
-    """Actor for training DBSR model on synthetic bursts """
-    def __init__(self, net, objective, loss_weight=None):
-        super().__init__(net, objective)
-        if loss_weight is None:
-            loss_weight = {'rgb': 1.0}
-        self.loss_weight = loss_weight
-
-    def __call__(self, data):
-        # Run network
-        pred, aux_dict = self.net(data['burst'])
         # print(pred.shape)
         gt = data['frame_gt'].unsqueeze(dim=1).repeat(1, pred.shape[1], 1, 1, 1)
         loss_rgb_raw = self.objective['rgb'](pred, gt)
@@ -77,131 +46,6 @@ class DBSRSyntheticActorMultiOut(BaseActor):
             stats['Stat/psnr'] = psnr.item()
 
         return loss, stats
-class DBSRSyntheticActorMultiOutFrameBetterLoss(BaseActor):
-    """Actor for training DBSR model on synthetic bursts """
-    def __init__(self, net, objective, loss_weight=None):
-        super().__init__(net, objective)
-        if loss_weight is None:
-            loss_weight = {'rgb': 1.0}
-        self.loss_weight = loss_weight
-
-    def __call__(self, data):
-        # Run network
-        pred, aux_dict = self.net(data['burst'])
-        cur_frame = pred[:, 1, ...]
-        next_frame = pred[:, 2, ...]
-        pred = pred[:, :2, ...]
-        gt = data['frame_gt'].unsqueeze(dim=1).repeat(1, 2, 1, 1, 1)
-        loss_rgb_raw = self.objective['rgb'](pred, gt)
-        # m = torch.abs(next_frame-data['frame_gt'])-torch.abs(cur_frame-data['frame_gt'])
-        # print(torch.mean(torch.abs(next_frame-data['frame_gt'])), torch.mean(torch.abs(cur_frame-data['frame_gt'])))
-        loss_better = torch.mean(torch.max(torch.abs(next_frame-data['frame_gt'])-torch.abs(cur_frame-data['frame_gt']), 
-                                torch.zeros_like(cur_frame)))
-        if 'psnr' in self.objective.keys():
-            psnr = self.objective['psnr'](pred[:,0, ...].clone().detach(), data['frame_gt'])
-
-        loss = loss_rgb_raw + loss_better
-
-        stats = {'Loss/total': loss.item(),
-                 'Loss/raw': loss_rgb_raw.item(),
-                 'Loss/better': loss_better.item()}
-
-        if 'psnr' in self.objective.keys():
-            stats['Stat/psnr'] = psnr.item()
-
-        return loss, stats
-
-class DBSRSyntheticActorMultiOutGTchange(BaseActor):
-    """Actor for training DBSR model on synthetic bursts """
-    def __init__(self, net, objective, loss_weight=None):
-        super().__init__(net, objective)
-        if loss_weight is None:
-            loss_weight = {'rgb': 1.0}
-        self.loss_weight = loss_weight
-
-    def __call__(self, data):
-        # Run network
-        pred, aux_dict = self.net(data['burst'])
-        pseduo_gt = pred[:, 0, ...].detach().unsqueeze(dim=1)
-        gt = data['frame_gt'].unsqueeze(dim=1)
-        real_gt = torch.cat([gt, gt], dim=1)
-        self_gt = torch.cat([gt, pseduo_gt], dim=1)   # 用14帧输出替代GT
-        loss_rgb_raw = self.objective['rgb'](pred, real_gt)
-        loss_rgb_self = self.objective['rgb'](pred, self_gt)
-
-        if 'psnr' in self.objective.keys():
-            psnr = self.objective['psnr'](pred[:,0, ...].clone().detach(), data['frame_gt'])
-
-        loss = loss_rgb_raw + loss_rgb_self
-
-        stats = {'Loss/total': loss.item(),
-                 'Loss/raw': loss_rgb_raw.item(),
-                 'Loss/self': loss_rgb_self.item()}
-
-        if 'psnr' in self.objective.keys():
-            stats['Stat/psnr'] = psnr.item()
-
-        return loss, stats
-class DBSRSyntheticForwardReverseActor(BaseActor):
-    """Actor for training DBSR model on synthetic bursts """
-    def __init__(self, net, objective, loss_weight=None):
-        super().__init__(net, objective)
-        if loss_weight is None:
-            loss_weight = {'rgb': 1.0}
-        self.loss_weight = loss_weight
-        # 0 1 2 3 4 5 6 7 8 9 10 11 12 13
-        self.perm = [0, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
-    def __call__(self, data):
-        # Run network
-        pred, aux_dict = self.net(data['burst'])
-        with torch.no_grad():
-            pred_reverse, _ = self.net(data['burst'][:,self.perm, ...])
-        # Compute loss
-        loss_rgb = self.objective['rgb'](pred, data['frame_gt']) * self.loss_weight['rgb']
-        loss_reverse = self.objective['rev'](pred, pred_reverse) * self.loss_weight['rev'] 
-        
-        if 'psnr' in self.objective.keys():
-            psnr = self.objective['psnr'](pred[:, ...].clone().detach(), data['frame_gt'])
-
-        loss = loss_rgb + loss_reverse
-        # loss = loss_reverse  不拿GT进来肯定是不行的
-
-        stats = {'Loss/total': loss.item(),
-                 'Loss/rgb': loss_rgb.item(),
-                 'Loss/reverse': loss_reverse.item()}
-
-        if 'psnr' in self.objective.keys():
-            stats['Stat/psnr'] = psnr.item()
-
-        return loss, stats
-class DBSRSyntheticActorAuxLoss(BaseActor):
-    """Actor for training DBSR model on synthetic bursts """
-    def __init__(self, net, objective, loss_weight=None):
-        super().__init__(net, objective)
-        self.loss_weight = loss_weight
-
-    def __call__(self, data):
-        # Run network
-        pred, aux_dict = self.net(data['burst'])
-
-        # Compute loss
-        lossL1 = self.objective['rgb'](pred, data['frame_gt']) * self.loss_weight['rgb']
-        lossAux = self.objective['aux'](pred, data['frame_gt']) * self.loss_weight['aux']    # 加一项其它辅助Loss
-        loss = lossL1 + lossAux
-
-        if 'psnr' in self.objective.keys():
-            psnr = self.objective['psnr'](pred[:, ...].clone().detach(), data['frame_gt'])
-
-
-        stats = {'Loss/total': loss.item(),
-                 'Loss/L1': lossL1.item(),
-                 'Loss/Aux': lossAux.item()}
-
-        if 'psnr' in self.objective.keys():
-            stats['Stat/psnr'] = psnr.item()
-
-        return loss, stats
-
 
 class DBSRRealWorldActor(BaseActor):
     """Actor for training DBSR model on real-world bursts from BurstSR dataset"""
@@ -226,6 +70,9 @@ class DBSRRealWorldActor(BaseActor):
         gt = data['frame_gt']
         burst = data['burst']
         pred, aux_dict = self.net(burst)
+        pred = torch.cat([pred[:, 0, ...], pred[:, 1, ...]], dim=0)
+        burst = torch.cat([burst, burst], dim=0)
+        gt = torch.cat([gt, gt], dim=0)
 
         # Perform spatial and color alignment of the prediction
         pred_warped_m, valid = self.sca(pred, gt, burst)
