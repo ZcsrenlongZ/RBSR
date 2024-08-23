@@ -1,4 +1,4 @@
-# RBSR: Efficient and Flexible Recurrent Network for Burst Super-Resolution [PRCV2023]
+# RBSR: Efficient and Flexible Recurrent Network for Burst Super-Resolution [PRCV 2023]
 
 Official implementation of [RBSR: Efficient and Flexible Recurrent Network for Burst Super-Resolution](https://arxiv.org/abs/2306.17595)
 
